@@ -26,12 +26,9 @@ else
   # Imprimir mensaje de bienvenida
   echo "Welcome back, $NAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
 fi
-
 USER_ID=$($PSQL "SELECT user_id FROM users WHERE usernames = '$NAME'")
-
 # Verificar si el usuario ya ha jugado anteriormente
 PLAYS=$($PSQL "SELECT COUNT(*) FROM plays WHERE user_id = $USER_ID")
-
 if [[ $PLAYS -eq 0 ]]
 then 
   # Si no existen jugadas, crear un nuevo registro con la primera jugada
@@ -43,7 +40,6 @@ fi
 
 # Generar número aleatorio entre 1 y 1000
 NUMBER=$((RANDOM % 1000 + 1))
-
 # Inicializar el contador de intentos
 TRIES=0
 
@@ -51,7 +47,6 @@ TRIES=0
 GUESS() {
   # Leer el número ingresado por el usuario
   read USER_NUMBER
-
   # Verificar si la entrada es un número entero
   if ! [[ $USER_NUMBER =~ ^[0-9]+$ ]]
   then
