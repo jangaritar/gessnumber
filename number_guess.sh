@@ -59,18 +59,14 @@ GUESS() {
     GUESS  # Llamar de nuevo a la función para pedir otro intento
     return
   fi
-  
   # Incrementar el contador de intentos
   ((TRIES++))
-  
   # Comprobar si el número ingresado es igual al número secreto
   if [[ $NUMBER -eq $USER_NUMBER ]]
   then
     echo "You guessed it in $TRIES tries. The secret number was $NUMBER. Nice job!"
-
     # Insertar una nueva jugada en la tabla plays
     INSERT_TRY=$($PSQL "INSERT INTO plays(user_id, play_count, tries) VALUES($USER_ID, 1, $TRIES)")
-
     return 0  # Terminar la función
   elif [[ $NUMBER -gt $USER_NUMBER ]]
   then
