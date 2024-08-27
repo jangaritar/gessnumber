@@ -1,78 +1,80 @@
 #!/bin/bash
+
 PSQL="psql --username=freecodecamp --dbname=number_guess -t --no-align -c"
+SECRET_NUMBER=$(( $RANDOM % 1000 + 1 ))
+# echo "$SECRET_NUMBER"
 
-echo "Enter your username:"
-read NAME
+ASK_USERNAME(){
+  echo -e "\nEnter your username:"
+  read USERNAME
 
-# Buscar si el usuario ya existe
-USER=$($PSQL "SELECT usernames FROM users WHERE usernames = '$NAME'")
-
-# Si el usuario no existe
-if [[ -z $USER ]]
-then
-  # Insertar nuevo usuario si no existe
-  NUSER=$($PSQL "INSERT INTO users(usernames) VALUES('$NAME')")
-  echo "Welcome, $NAME! It looks like this is your first time here."
-else 
-  # Obtener ID del usuario
-  USER_ID=$($PSQL "SELECT user_id FROM users WHERE usernames = '$NAME'")
-
-  # Contar el número de juegos jugados por el usuario
-  GAMES_PLAYED=$($PSQL "SELECT COUNT(*) FROM plays WHERE user_id = $USER_ID")
-
-  # Obtener el número mínimo de intentos del mejor juego
-  BEST_GAME=$($PSQL "SELECT MIN(tries) FROM plays WHERE user_id = $USER_ID")
-
-  # Imprimir mensaje de bienvenida
-  echo "Welcome back, $NAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
-fi
-USER_ID=$($PSQL "SELECT user_id FROM users WHERE usernames = '$NAME'")
-# Verificar si el usuario ya ha jugado anteriormente
-PLAYS=$($PSQL "SELECT COUNT(*) FROM plays WHERE user_id = $USER_ID")
-if [[ $PLAYS -eq 0 ]]
-then 
-  # Si no existen jugadas, crear un nuevo registro con la primera jugada
-  F_PLAY=$($PSQL "INSERT INTO plays(user_id, play_count) VALUES($USER_ID, 1)")
-else 
-  # Si ya existen jugadas, simplemente insertar una nueva jugada con play_count = 1
-  F_PLAY=$($PSQL "INSERT INTO plays(user_id, play_count) VALUES($USER_ID, 1)")
-fi
-
-# Generar número aleatorio entre 1 y 1000
-NUMBER=$((RANDOM % 1000 + 1))
-# Inicializar el contador de intentos
-TRIES=0
-
-# Función para adivinar
-GUESS() {
-  # Leer el número ingresado por el usuario
-  read USER_NUMBER
-  # Verificar si la entrada es un número entero
-  if ! [[ $USER_NUMBER =~ ^[0-9]+$ ]]
+  USERNAME_CHARACTERS=$(echo $USERNAME | wc -c)
+  if [[ $USERNAME_CHARACTERS -gt 22 ]]
   then
-    echo "That is not an integer, guess again:"
-    GUESS  # Llamar de nuevo a la función para pedir otro intento
-    return
+    ASK_USERNAME
   fi
-  # Incrementar el contador de intentos
-  ((TRIES++))
-  # Comprobar si el número ingresado es igual al número secreto
-  if [[ $NUMBER -eq $USER_NUMBER ]]
-  then
-    echo "You guessed it in $TRIES tries. The secret number was $NUMBER. Nice job!"
-    # Insertar una nueva jugada en la tabla plays
-    INSERT_TRY=$($PSQL "INSERT INTO plays(user_id, play_count, tries) VALUES($USER_ID, 1, $TRIES)")
-    return 0  # Terminar la función
-  elif [[ $NUMBER -gt $USER_NUMBER ]]
-  then
-    echo "It's higher than that, guess again:"
-  elif [[ $NUMBER -lt $USER_NUMBER ]]
-  then
-    echo "It's lower than that, guess again:"
-  fi
-  # Llamar a la función de nuevo para otro intento
-  GUESS
 }
-# Mensaje inicial y primer intento
-echo "Guess the secret number between 1 and 1000:"
-GUESS
+
+ASK_USERNAME
+RETURNING_USER=$($PSQL "SELECT username FROM users WHERE username = '$USERNAME'")
+# RETURNING_USER_HAS_ONE=$($PSQL "SELECT COUNT(*) FROM users INNER JOIN games USING(user_id) WHERE username = '$USERNAME'")
+if [[ -z $RETURNING_USER ]]
+then
+  INSERTED_USER=$($PSQL "INSERT INTO users (username) VALUES ('$USERNAME')")
+  echo -e "\nWelcome, $USERNAME! It looks like this is your first time here."
+
+else
+  GAMES_PLAYED=$($PSQL "SELECT COUNT(*) FROM games INNER JOIN users USING(user_id) WHERE username = '$USERNAME'")
+  BEST_GAME=$($PSQL "SELECT MIN(guesses) FROM games INNER JOIN users USING(user_id) WHERE username = '$USERNAME'")
+  GAMES=$(if [[ $GAMES_PLAYED -eq 1 ]]; then echo "game"; else echo "games"; fi)
+  GUESSES=$(if [[ $BEST_GAME -eq 1 ]]; then echo "guess"; else echo "guesses"; fi)
+  echo -e "\nWelcome back, $USERNAME! You have played $GAMES_PLAYED games, and your best game took $BEST_GAME guesses."
+fi
+
+# Grab user_id
+USER_ID=$($PSQL "SELECT user_id FROM users WHERE username = '$USERNAME'")
+
+TRIES=1
+GUESS=0
+
+GUESSING_MACHINE(){
+
+  read GUESS
+
+
+  while [[ $GUESS =~ ^[+-]?[0-9]+$ && ! $GUESS -eq $SECRET_NUMBER ]]
+  do
+
+    TRIES=$(expr $TRIES + 1)
+
+    if [[ $GUESS -gt $SECRET_NUMBER ]]
+    then
+
+      echo -e "\nIt's lower than that, guess again:"
+      read GUESS
+
+    elif [[ $GUESS -lt $SECRET_NUMBER ]]
+    then
+
+      echo -e "\nIt's higher than that, guess again:"
+      read GUESS
+
+    fi
+  done
+
+  if [[ ! $GUESS =~ ^[0-9]+$ ]]
+  then
+      echo -e "\nThat is not an integer, guess again:"
+      TRIES=$(expr $TRIES + 1)
+      GUESSING_MACHINE
+  fi
+
+}
+
+echo -e "\nGuess the secret number between 1 and 1000:"
+GUESSING_MACHINE
+
+# insert data from game
+INSERTED_GAME=$($PSQL "INSERT INTO games (user_id, guesses) VALUES ($USER_ID, $TRIES)")
+PLURAL_TRIES=$(if [[ $TRIES -eq 1 ]]; then echo "try"; else echo "tries"; fi)
+echo -e "\nYou guessed it in $TRIES tries. The secret number was $SECRET_NUMBER. Nice job!"
