@@ -79,11 +79,9 @@ GUESS() {
   then
     echo "It's lower than that, guess again:"
   fi
-
   # Llamar a la función de nuevo para otro intento
   GUESS
 }
-
 # Mensaje inicial y primer intento
 echo "Guess the secret number between 1 and 1000:"
 GUESS
